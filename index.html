@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WaterWatch UP — Water Quality Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0D1B2A;--bg2:#112233;--bg3:#162840;
+  --cyan:#00B4D8;--cyan-dim:#00B4D820;
+  --red:#FF6B6B;--red-dim:#FF6B6B20;
+  --orange:#F4A261;--orange-dim:#F4A26120;
+  --green:#06D6A0;--green-dim:#06D6A020;
+  --gold:#FFD166;--gold-dim:#FFD16620;
+  --text:#E8F4FD;--text2:#8BAABE;--text3:#4A6A85;
+  --border:#1E3A52;--border2:#2A4D6A;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden}
+.app{display:flex;height:100vh}
+.sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:52px;min-height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px}
+.content{flex:1;overflow-y:auto;padding:24px}
+.logo{padding:18px 16px 14px;border-bottom:1px solid var(--border)}
+.logo-title{font-size:16px;font-weight:800;color:var(--cyan)}
+.logo-sub{font-size:10px;color:var(--text2);margin-top:2px}
+.nav-section{padding:10px 12px 4px;font-size:9px;font-weight:600;color:var(--text3);letter-spacing:1px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;font-size:12.5px;color:var(--text2);border-left:3px solid transparent;transition:all .15s}
+.nav-item:hover{background:var(--cyan-dim);color:var(--text);border-left-color:var(--cyan-dim)}
+.nav-item.active{background:var(--cyan-dim);color:var(--cyan);border-left-color:var(--cyan);font-weight:600}
+.nav-icon{width:16px;text-align:center;font-size:14px}
+.sidebar-footer{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);line-height:1.6}
+.topbar-title{font-size:14px;font-weight:600}
+.topbar-sub{font-size:11px;color:var(--text2)}
+.topbar-badge{margin-left:auto;display:flex;gap:8px}
+.badge{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600}
+.badge-live{background:#FF6B6B20;color:#FF6B6B;border:1px solid #FF6B6B40}
+.badge-proj{background:var(--cyan-dim);color:var(--cyan);border:1px solid #00B4D840}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}
+.grid-12{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:20px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.card-badge{font-size:9px;padding:2px 8px;border-radius:10px;background:var(--cyan-dim);color:var(--cyan);font-weight:600}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent,var(--cyan))}
+.stat-value{font-size:28px;font-weight:800;font-family:var(--mono);line-height:1;margin:6px 0 4px;color:var(--accent,var(--cyan))}
+.stat-label{font-size:10px;color:var(--text2);font-weight:500}
+.stat-sub{font-size:10px;color:var(--text3);margin-top:4px}
+.stat-card.red{--accent:var(--red)}.stat-card.orange{--accent:var(--orange)}.stat-card.green{--accent:var(--green)}.stat-card.gold{--accent:var(--gold)}
+.section-title{font-size:18px;font-weight:700;margin-bottom:6px}
+.section-sub{font-size:12px;color:var(--text2);margin-bottom:20px}
+.risk-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.risk-name{font-size:11px;min-width:130px;font-weight:500}
+.risk-bar-wrap{flex:1;height:7px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.risk-bar{height:100%;border-radius:4px}
+.risk-score{font-size:11px;font-family:var(--mono);color:var(--text2);min-width:38px;text-align:right}
+.risk-label{font-size:9px;padding:2px 7px;border-radius:8px;font-weight:600;min-width:48px;text-align:center}
+.risk-high{background:var(--red-dim);color:var(--red)}.risk-med{background:var(--orange-dim);color:var(--orange)}.risk-low{background:var(--green-dim);color:var(--green)}
+.bis-table{width:100%;border-collapse:collapse}
+.bis-table th{font-size:9px;color:var(--text3);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.5px}
+.bis-table td{font-size:11px;padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text);font-family:var(--mono)}
+.bis-table tr:hover td{background:var(--bg3)}
+.exceed{color:var(--red)!important;font-weight:600}.safe{color:var(--green)!important}
+.site-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;overflow:hidden;transition:border-color .2s}
+.site-card:hover{border-color:var(--cyan)}
+.site-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--site-color,var(--cyan))}
+.site-num{font-size:10px;font-weight:700;color:var(--site-color,var(--cyan));text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.site-village{font-size:17px;font-weight:800;margin-bottom:2px}
+.site-location{font-size:11px;color:var(--text2);margin-bottom:12px}
+.site-params{display:flex;flex-wrap:wrap;gap:6px}
+.param-chip{font-size:9px;padding:3px 8px;border-radius:6px;background:var(--red-dim);color:var(--red);font-weight:600;font-family:var(--mono)}
+.param-chip.ok{background:var(--green-dim);color:var(--green)}
+.disease-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.disease-item:last-child{border-bottom:none}
+.disease-icon{font-size:22px;width:36px;text-align:center}
+.disease-name{font-size:13px;font-weight:700;margin-bottom:2px}
+.disease-cause{font-size:10px;color:var(--orange);font-weight:600;margin-bottom:3px}
+.disease-desc{font-size:11px;color:var(--text2);line-height:1.5}
+.disease-risk{font-size:9px;padding:2px 8px;border-radius:8px;display:inline-block;margin-top:4px;font-weight:600}
+.risk-critical{background:#FF6B6B30;color:var(--red)}.risk-high2{background:#F4A26130;color:var(--orange)}.risk-mod{background:#FFD16630;color:var(--gold)}
+.intel-box{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:16px;margin-bottom:12px}
+.intel-label{font-size:9px;font-weight:700;color:var(--cyan);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.intel-text{font-size:12px;line-height:1.7}
+.tab-bar{display:flex;gap:2px;margin-bottom:20px;background:var(--bg3);padding:4px;border-radius:8px;width:fit-content}
+.tab{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s}
+.tab.active{background:var(--bg2);color:var(--cyan);font-weight:600}
+.tab:hover:not(.active){color:var(--text)}
+.page{display:none}.page.active{display:block}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.content{scrollbar-width:thin;scrollbar-color:var(--border2) var(--bg)}
+
+/* MAP */
+#real-map{height:430px;border-radius:10px;border:1px solid var(--border);overflow:hidden;z-index:1}
+.leaflet-container{background:#0a1520!important;font-family:var(--font)!important}
+.custom-popup .leaflet-popup-content-wrapper{background:#112233;border:1px solid #2A4D6A;border-radius:10px;box-shadow:0 4px 24px #00000099;color:#E8F4FD}
+.custom-popup .leaflet-popup-tip{background:#112233}
+.custom-popup .leaflet-popup-content{margin:14px 16px;font-family:'Inter',sans-serif;min-width:210px}
+.custom-popup .leaflet-popup-close-button{color:#8BAABE!important}
+.popup-name{font-size:14px;font-weight:700;margin-bottom:4px;color:#E8F4FD}
+.popup-risk{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:600;display:inline-block;margin-bottom:8px}
+.popup-row{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid #1E3A52}
+.popup-row:last-child{border:none;margin-bottom:0}
+.popup-key{color:#8BAABE}.popup-val{font-family:'JetBrains Mono',monospace;font-weight:600;color:#E8F4FD}
+.popup-val.bad{color:#FF6B6B}.popup-val.ok{color:#06D6A0}
+.map-controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.map-ctrl-btn{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text2);transition:all .15s}
+.map-ctrl-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.map-ctrl-btn.active{background:var(--cyan-dim);color:var(--cyan);border-color:var(--cyan)}
+.map-legend-box{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding:10px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;align-items:center}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-title">💧 WaterWatch UP</div>
+    <div class="logo-sub">Water Quality Intelligence <br>IIIT Allahabad</div>
+  </div>
+  <div class="nav-section">Dashboard</div>
+  <div class="nav-item active" onclick="showPage('overview',this)"><span class="nav-icon">📊</span>Overview</div>
+  <div class="nav-item" onclick="showPage('map',this)"><span class="nav-icon">🗺️</span>Risk Map</div>
+  <div class="nav-section">Clustering Results</div>
+  <div class="nav-item" onclick="showPage('district',this)"><span class="nav-icon">🏛️</span>District Level</div>
+  <div class="nav-item" onclick="showPage('block',this)"><span class="nav-icon">🧱</span>Block Level</div>
+  <div class="nav-item" onclick="showPage('village',this)"><span class="nav-icon">🏘️</span>Village Level</div>
+  <div class="nav-item" onclick="showPage('sites',this)"><span class="nav-icon">📍</span>Field Visit Sites</div>
+  <div class="nav-section">Analysis</div>
+  <div class="nav-item" onclick="showPage('parameters',this)"><span class="nav-icon">🧪</span>Parameter Analysis</div>
+  <div class="nav-item" onclick="showPage('diseases',this)"><span class="nav-icon">🏥</span>Health Impact</div>
+  <div class="nav-item" onclick="showPage('intel',this)"><span class="nav-icon">🧠</span>AI Intelligence</div>
+  <div class="sidebar-footer" style="background-color: aquamarine;">Developed By: Abid Ali<br/>PI: Dr. Saurabh Mishra<br/>IIIT Allahabad</div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title" id="page-title">Overview</div>
+      <div class="topbar-sub">Eastern Uttar Pradesh — AI-Enhanced Water Quality Monitoring</div>
+    </div>
+    <div class="topbar-badge">
+      <span class="badge badge-live">● SECONDARY DATA</span>
+      <span class="badge badge-proj">CST-UP PROJECT</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="page-overview">
+      <div class="section-title">Water Quality Intelligence Dashboard</div>
+      <div class="section-sub">K-Means Hierarchical Clustering · 27 Districts · 3 Field Visit Sites Selected</div>
+      <div class="grid-4">
+        <div class="stat-card red"><div class="stat-label">Highest Risk District</div><div class="stat-value">Kaus.</div><div class="stat-sub">Score 25.65 | Nitrate 3.2× BIS</div></div>
+        <div class="stat-card orange"><div class="stat-label">Districts Analysed</div><div class="stat-value">27</div><div class="stat-sub">Eastern Uttar Pradesh</div></div>
+        <div class="stat-card gold"><div class="stat-label">Field Visit Sites</div><div class="stat-value">3</div><div class="stat-sub">Selected via hierarchical clustering</div></div>
+        <div class="stat-card green"><div class="stat-label">Most Critical</div><div class="stat-value">NO₃</div><div class="stat-sub">Nitrate 240 mg/L @ Muratganj</div></div>
+      </div>
+      <div class="grid-12">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Cluster Distribution</span><span class="card-badge">27 Districts</span></div>
+          <canvas id="donutChart" height="200"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Top 10 Districts — Risk Score</span></div>
+          <canvas id="districtBar" height="200"></canvas>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="site-card" style="--site-color:#FF6B6B">
+          <div class="site-num">★ Field Visit Site #1</div><div class="site-village">Balkaranpur</div>
+          <div class="site-location">Muratganj Block · Kaushambi</div>
+          <div class="site-params"><span class="param-chip">Hardness 1.97×</span><span class="param-chip">Turbidity 2.63×</span><span class="param-chip">FRC critically low</span></div>
+        </div>
+        <div class="site-card" style="--site-color:#F4A261">
+          <div class="site-num">★ Field Visit Site #2</div><div class="site-village">Gain</div>
+          <div class="site-location">Mardah Block · Ghazipur</div>
+          <div class="site-params"><span class="param-chip">Turbidity 2.94×</span><span class="param-chip">FRC below min</span><span class="param-chip ok">TDS OK</span></div>
+        </div>
+        <div class="site-card" style="--site-color:#FFD166">
+          <div class="site-num">★ Field Visit Site #3</div><div class="site-village">Karenti</div>
+          <div class="site-location">Kunda Block · Pratapgarh</div>
+          <div class="site-params"><span class="param-chip">TDS 1.4×</span><span class="param-chip">Turbidity 4.11×</span><span class="param-chip">FRC = ZERO</span><span class="param-chip">Alkalinity 1.91×</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAP -->
+    <div class="page" id="page-map">
+      <div class="section-title">Risk Map — Eastern Uttar Pradesh</div>
+      <div class="section-sub">Real interactive map · OpenStreetMap + Leaflet.js · Click any marker for water quality details</div>
+      <div class="map-controls">
+        <div class="map-ctrl-btn active" onclick="filterMap('all',this)">🗺️ All Layers</div>
+        <div class="map-ctrl-btn" onclick="filterMap('district',this)">🏛️ Districts Only</div>
+        <div class="map-ctrl-btn" onclick="filterMap('block',this)">🧱 Worst Blocks</div>
+        <div class="map-ctrl-btn" onclick="filterMap('village',this)">⭐ Field Sites Only</div>
+      </div>
+      <div id="real-map"></div>
+      <div class="map-legend-box">
+        <span style="font-size:10px;font-weight:600;color:var(--text2)">LEGEND:</span>
+        <div class="legend-item"><div class="legend-dot" style="background:#FF6B6B"></div>High Risk District</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#F4A261"></div>Medium Risk</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#06D6A0"></div>Low Risk</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#FF6B6B;border:2px solid #fff;width:11px;height:11px;border-radius:2px;transform:rotate(45deg)"></div>Worst Block</div>
+        <div class="legend-item"><span style="font-size:14px">⭐</span>Field Visit Site</div>
+        <div style="margin-left:auto;font-size:10px;color:var(--text3)">© OpenStreetMap contributors · Leaflet.js</div>
+      </div>
+    </div>
+
+    <!-- DISTRICT -->
+    <div class="page" id="page-district">
+      <div class="section-title">Phase 1 — District Level Clustering</div>
+      <div class="section-sub">K-Means (K=3) · 27 districts · Parameters: pH, EC, Fluoride, Nitrate, Hardness, TDS</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">All Districts — Risk Ranking</span><span class="card-badge">K=3</span></div>
+          <div id="districtRankList" style="max-height:420px;overflow-y:auto"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Full Distribution</span></div>
+          <canvas id="districtFull" height="320"></canvas>
+          <div style="margin-top:14px"><div class="intel-box"><div class="intel-label">Key Finding</div><div class="intel-text">Kaushambi district Risk Score 25.65 — driven by Nitrate at 146 mg/L (3.24× BIS limit of 45 mg/L). Poses severe Blue Baby Syndrome risk for infants under 6 months.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOCK -->
+    <div class="page" id="page-block">
+      <div class="section-title">Phase 2 — Block Level Clustering</div>
+      <div class="section-sub">K-Means (K=3) per district · Parameters: pH, EC, Fluoride, Nitrate, Hardness</div>
+      <div class="tab-bar">
+        <div class="tab active" onclick="showBlockTab('kaushambi',this)">Kaushambi (8 blocks)</div>
+        <div class="tab" onclick="showBlockTab('ghazipur',this)">Ghazipur (16 blocks)</div>
+        <div class="tab" onclick="showBlockTab('pratapgarh',this)">Pratapgarh (16 blocks)</div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><div class="card-header"><span class="card-title" id="block-chart-title">Kaushambi — Block Risk Scores</span></div><canvas id="blockBar" height="300"></canvas></div>
+        <div class="card"><div class="card-header"><span class="card-title">Worst Block Details</span></div><div id="block-detail"></div></div>
+      </div>
+    </div>
+
+    <!-- VILLAGE -->
+    <div class="page" id="page-village">
+      <div class="section-title">Phase 3 — Village Level Clustering</div>
+      <div class="section-sub">K-Means (K=3) per block · 8–9 parameters including FRC (inverse risk)</div>
+      <div class="tab-bar">
+        <div class="tab active" onclick="showVillageTab('muratganj',this)">Muratganj (61 villages)</div>
+        <div class="tab" onclick="showVillageTab('mardah',this)">Mardah (61 villages)</div>
+        <div class="tab" onclick="showVillageTab('kunda',this)">Kunda (24 villages)</div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><div class="card-header"><span class="card-title" id="village-chart-title">Muratganj — Village Cluster Distribution</span></div><canvas id="villageChart" height="280"></canvas></div>
+        <div class="card"><div class="card-header"><span class="card-title">Worst Village — Parameter Detail</span></div><div id="village-detail"></div></div>
+      </div>
+    </div>
+
+    <!-- SITES -->
+    <div class="page" id="page-sites">
+      <div class="section-title">Final Field Visit Sites</div>
+      <div class="section-sub">3 villages selected via 3-level hierarchical K-Means clustering as primary data collection sites</div>
+      <div class="grid-3">
+        <div class="site-card" style="--site-color:var(--red)">
+          <div class="site-num">📍 Field Visit Site #1 — KAUSHAMBI</div>
+          <div class="site-village">Balkaranpur</div>
+          <div class="site-location">Muratganj Block · Risk Score: <strong style="color:var(--red);font-family:var(--mono)">24.46</strong></div>
+          <table class="bis-table" style="margin-top:10px">
+            <tr><th>Parameter</th><th>Value</th><th>BIS</th><th>Status</th></tr>
+            <tr><td>TDS</td><td class="exceed">523 mg/L</td><td>500</td><td class="exceed">❌ Exceed</td></tr>
+            <tr><td>Hardness</td><td class="exceed">394 mg/L</td><td>200</td><td class="exceed">❌ 1.97×</td></tr>
+            <tr><td>Turbidity</td><td class="exceed">2.63 NTU</td><td>≤1</td><td class="exceed">❌ 2.63×</td></tr>
+            <tr><td>Alkalinity</td><td class="exceed">424 mg/L</td><td>200</td><td class="exceed">❌ 2.12×</td></tr>
+            <tr><td>FRC</td><td class="exceed">0.05 mg/L</td><td>≥0.2</td><td class="exceed">❌ Critical</td></tr>
+          </table>
+        </div>
+        <div class="site-card" style="--site-color:var(--orange)">
+          <div class="site-num">📍 Field Visit Site #2 — GHAZIPUR</div>
+          <div class="site-village">Gain</div>
+          <div class="site-location">Mardah Block · Risk Score: <strong style="color:var(--orange);font-family:var(--mono)">17.60</strong></div>
+          <table class="bis-table" style="margin-top:10px">
+            <tr><th>Parameter</th><th>Value</th><th>BIS</th><th>Status</th></tr>
+            <tr><td>TDS</td><td class="safe">318 mg/L</td><td>500</td><td class="safe">✅ OK</td></tr>
+            <tr><td>Hardness</td><td class="safe">162 mg/L</td><td>200</td><td class="safe">✅ OK</td></tr>
+            <tr><td>Turbidity</td><td class="exceed">2.94 NTU</td><td>≤1</td><td class="exceed">❌ 2.94×</td></tr>
+            <tr><td>Chloride</td><td class="safe">51 mg/L</td><td>250</td><td class="safe">✅ OK</td></tr>
+            <tr><td>FRC</td><td class="exceed">0.10 mg/L</td><td>≥0.2</td><td class="exceed">❌ Below</td></tr>
+          </table>
+        </div>
+        <div class="site-card" style="--site-color:var(--gold)">
+          <div class="site-num">📍 Field Visit Site #3 — PRATAPGARH</div>
+          <div class="site-village">Karenti</div>
+          <div class="site-location">Kunda Block · Risk Score: <strong style="color:var(--gold);font-family:var(--mono)">59.01</strong></div>
+          <table class="bis-table" style="margin-top:10px">
+            <tr><th>Parameter</th><th>Value</th><th>BIS</th><th>Status</th></tr>
+            <tr><td>TDS</td><td class="exceed">700.7 mg/L</td><td>500</td><td class="exceed">❌ 1.4×</td></tr>
+            <tr><td>Hardness</td><td class="exceed">316 mg/L</td><td>200</td><td class="exceed">❌ 1.58×</td></tr>
+            <tr><td>Turbidity</td><td class="exceed">4.11 NTU</td><td>≤1</td><td class="exceed">❌ 4.11×</td></tr>
+            <tr><td>Alkalinity</td><td class="exceed">382.2 mg/L</td><td>200</td><td class="exceed">❌ 1.91×</td></tr>
+            <tr><td>FRC</td><td class="exceed">0.00 mg/L</td><td>≥0.2</td><td class="exceed">❌ ZERO</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="card"><div class="card-header"><span class="card-title">Site Comparison — BIS Exceedance Ratios</span></div><canvas id="siteCompare" height="160"></canvas></div>
+    </div>
+
+    <!-- PARAMETERS -->
+    <div class="page" id="page-parameters">
+      <div class="section-title">Parameter Analysis — BIS IS 10500:2012</div>
+      <div class="section-sub">All parameters vs Bureau of Indian Standards drinking water specifications</div>
+      <div class="grid-2">
+        <div class="card"><div class="card-header"><span class="card-title">Radar — Top 3 Districts</span></div><canvas id="paramRadar" height="300"></canvas></div>
+        <div class="card"><div class="card-header"><span class="card-title">BIS Exceedance — Grouped</span></div><canvas id="paramGrouped" height="300"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Complete BIS Reference Table</span></div>
+        <table class="bis-table">
+          <tr><th>Parameter</th><th>BIS IS 10500:2012</th><th>Kaushambi</th><th>Ghazipur</th><th>Pratapgarh</th><th>Health Impact</th></tr>
+          <tr><td>pH</td><td>6.5–8.5</td><td class="safe">7.83 ✅</td><td class="safe">7.69 ✅</td><td class="safe">7.79 ✅</td><td style="font-size:10px;color:var(--text2)">Corrosion, GI issues</td></tr>
+          <tr><td>EC (µS/cm)</td><td>&lt;750</td><td class="exceed">1265 ❌</td><td class="exceed">1403 ❌</td><td class="exceed">1274 ❌</td><td style="font-size:10px;color:var(--text2)">High salinity, kidney stress</td></tr>
+          <tr><td>Fluoride (mg/L)</td><td>&lt;1.0</td><td class="exceed">1.27 ❌</td><td class="safe">0.56 ✅</td><td class="safe">0.57 ✅</td><td style="font-size:10px;color:var(--text2)">Dental/skeletal fluorosis</td></tr>
+          <tr><td>Nitrate (mg/L)</td><td>&lt;45</td><td class="exceed">146 ❌</td><td class="exceed">81.1 ❌</td><td class="exceed">49 ❌</td><td style="font-size:10px;color:var(--text2)">Blue Baby Syndrome (infants)</td></tr>
+          <tr><td>Hardness (mg/L)</td><td>&lt;200</td><td class="exceed">500 ❌</td><td class="exceed">439 ❌</td><td class="exceed">430 ❌</td><td style="font-size:10px;color:var(--text2)">Kidney stones, cardiovascular risk</td></tr>
+          <tr><td>TDS (mg/L)</td><td>&lt;500</td><td class="exceed">810 ❌</td><td class="exceed">898 ❌</td><td class="exceed">725 ❌</td><td style="font-size:10px;color:var(--text2)">General health burden</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- DISEASES -->
+    <div class="page" id="page-diseases">
+      <div class="section-title">Health Impact — Waterborne Diseases</div>
+      <div class="section-sub">Diseases linked to contaminated drinking water · Special focus on women & children in rural Eastern UP</div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Chemical Contamination</span><span class="card-badge">Chronic</span></div>
+          <div class="disease-item"><div class="disease-icon">👶</div><div><div class="disease-name">Methemoglobinemia (Blue Baby Syndrome)</div><div class="disease-cause">Cause: Nitrate &gt;45 mg/L</div><div class="disease-desc">Nitrate converts haemoglobin in infants, reducing oxygen. Kaushambi Nitrate = 146 mg/L — 3.24× BIS. Can be fatal in infants under 6 months.</div><span class="disease-risk risk-critical">CRITICAL · Infants &lt;6 months</span></div></div>
+          <div class="disease-item"><div class="disease-icon">🦷</div><div><div class="disease-name">Dental & Skeletal Fluorosis</div><div class="disease-cause">Cause: Fluoride &gt;1.0 mg/L</div><div class="disease-desc">Mottling of teeth and bone deformation. Kaushambi Fluoride = 1.27 mg/L. Pregnant women and developing children most affected.</div><span class="disease-risk risk-high2">HIGH RISK · Children + Pregnant Women</span></div></div>
+          <div class="disease-item"><div class="disease-icon">🫘</div><div><div class="disease-name">Kidney Stones (Urolithiasis)</div><div class="disease-cause">Cause: Hardness &gt;200 mg/L + TDS &gt;500 mg/L</div><div class="disease-desc">High calcium/magnesium promotes stone formation. Worst blocks: Kaushambi 500, Ghazipur 439, Pratapgarh 430 mg/L.</div><span class="disease-risk risk-mod">MODERATE · Adults + Elderly</span></div></div>
+          <div class="disease-item"><div class="disease-icon">🫁</div><div><div class="disease-name">Arsenicosis</div><div class="disease-cause">Cause: Arsenic &gt;0.01 mg/L</div><div class="disease-desc">Skin lesions, neuropathy, and cancers from long-term arsenic. Eastern UP Ganga belt is in India's high-arsenic zone.</div><span class="disease-risk risk-high2">HIGH RISK · Long-term exposure</span></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Microbial Contamination</span><span class="card-badge">Acute</span></div>
+          <div class="disease-item"><div class="disease-icon">🦠</div><div><div class="disease-name">Acute Diarrhoeal Disease</div><div class="disease-cause">Cause: Low FRC + High Turbidity</div><div class="disease-desc">Insufficient chlorine + turbidity enables bacterial growth. Balkaranpur FRC=0.05, Karenti FRC=0.00. Leading cause of under-5 mortality in rural UP.</div><span class="disease-risk risk-critical">CRITICAL · Under-5 Mortality Risk</span></div></div>
+          <div class="disease-item"><div class="disease-icon">💛</div><div><div class="disease-name">Typhoid Fever</div><div class="disease-cause">Cause: Salmonella typhi in contaminated water</div><div class="disease-desc">Zero FRC = zero protection. High turbidity provides bacterial hiding places. Pregnant women risk miscarriage.</div><span class="disease-risk risk-high2">HIGH RISK · Women + Children</span></div></div>
+          <div class="disease-item"><div class="disease-icon">🫀</div><div><div class="disease-name">Hepatitis E</div><div class="disease-cause">Cause: Viral, faecal-oral route</div><div class="disease-desc">Maternal mortality 15–25% in third trimester. Karenti FRC=0.00 — maximum vulnerability. Most dangerous for pregnant women.</div><span class="disease-risk risk-critical">CRITICAL · Pregnant Women</span></div></div>
+          <div class="disease-item"><div class="disease-icon">🩸</div><div><div class="disease-name">Anaemia & Worm Infections</div><div class="disease-cause">Cause: Helminths + nutritional deficiency</div><div class="disease-desc">Roundworm/hookworm cause iron-deficiency anaemia. ~60% UP women anaemic (NFHS-5). Compounded by waterborne parasites.</div><span class="disease-risk risk-high2">HIGH RISK · Women + School Children</span></div></div>
+        </div>
+      </div>
+      <div class="card"><div class="card-header"><span class="card-title">Disease Vulnerability Index — Women & Children vs Contaminant</span></div><canvas id="diseaseChart" height="140"></canvas></div>
+    </div>
+
+    <!-- INTEL -->
+    <div class="page" id="page-intel">
+      <div class="section-title">AI Intelligence Brief</div>
+      <div class="section-sub">Research synthesis — methodology, findings, and recommendations</div>
+      <div class="grid-2">
+        <div>
+          <div class="intel-box"><div class="intel-label">Project Overview</div><div class="intel-text">CST-UP/DST funded project on AI-Enhanced Drinking Water Quality Monitoring in Rural Eastern Uttar Pradesh, IIIT Allahabad. Hierarchical K-Means clustering on secondary data (CGWB, JJM) identifies most water-vulnerable communities for primary field data collection, with focus on women and children.</div></div>
+          <div class="intel-box"><div class="intel-label">Methodology</div><div class="intel-text">Three-level hierarchical K-Means (K=3). Level 1: 27 districts, 6 parameters. Level 2: Blocks in worst 3 districts, 5 parameters. Level 3: Villages in worst blocks, 8–9 parameters including FRC as inverse risk. Weighted composite risk scores vs BIS IS 10500:2012. Missing values: column-wise median imputation (60% exclusion threshold). Optimal K via Elbow Method.</div></div>
+          <div class="intel-box"><div class="intel-label">Most Critical Finding</div><div class="intel-text">Karenti village (Kunda, Pratapgarh) — Risk Score 59.01. FRC = 0.00 mg/L (zero disinfection) + Turbidity 4.11 NTU (4.11× BIS). Five parameters simultaneously exceeding BIS limits. Highest microbial risk of all three field sites — priority for immediate intervention.</div></div>
+        </div>
+        <div>
+          <div class="intel-box"><div class="intel-label">Women & Children Vulnerability</div><div class="intel-text">• Nitrate (Kaushambi 146 mg/L) → Blue Baby Syndrome in infants &lt;6 months<br/>• Fluoride (1.27 mg/L) → fluorosis in children + pregnant women<br/>• FRC ≈ 0 in all 3 village sites → Hepatitis E (15–25% maternal mortality in 3rd trimester)<br/>• High turbidity → diarrhoea → leading cause of under-5 mortality in rural UP</div></div>
+          <div class="intel-box"><div class="intel-label">Field Visit Priority</div><div class="intel-text">1. Karenti (Site #3) — FRC=0, 5 params exceeding, Score 59.01<br/>2. Balkaranpur (Site #1) — FRC critical, 4 params exceeding, Score 24.46<br/>3. Gain (Site #2) — Turbidity + FRC, Score 17.60<br/><br/>Collect: water samples, household survey, GPS coordinates, women/children health indicators, primary water source documentation.</div></div>
+          <div class="intel-box"><div class="intel-label">Research Paper Citation Block</div><div class="intel-text" style="font-style:italic;font-size:11px">"A hierarchical K-Means clustering approach (K=3) was employed for secondary data analysis of 27 districts of Eastern Uttar Pradesh. Weighted composite risk scores were computed using BIS IS 10500:2012 limits (Fluoride, Nitrate: w=3; EC, Hardness, TDS: w=2; pH: w=1). Z-score standardisation applied prior to clustering. Optimal K by Elbow Method. Three field visit sites identified: Balkaranpur (Kaushambi), Gain (Ghazipur), Karenti (Pratapgarh)."</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────
+const districts=[
+  {name:"Kaushambi",    lat:25.5394,lng:81.3922,risk:"High Risk",  score:25.65,ec:1265,fluoride:1.27,nitrate:146,  hardness:500,tds:810},
+  {name:"Ghazipur",     lat:25.5780,lng:83.5799,risk:"Medium Risk",score:15.49,ec:1403,fluoride:0.56,nitrate:81.1, hardness:439,tds:898},
+  {name:"Pratapgarh",   lat:25.8960,lng:81.9860,risk:"Medium Risk",score:14.41,ec:1274,fluoride:0.57,nitrate:49,   hardness:430,tds:725},
+  {name:"Fatehpur",     lat:25.9304,lng:80.8133,risk:"Medium Risk",score:12.18,ec:1132,fluoride:0.62,nitrate:27,   hardness:320,tds:610},
+  {name:"Mirzapur",     lat:25.1336,lng:82.5685,risk:"Medium Risk",score:11.87,ec:980, fluoride:0.71,nitrate:35,   hardness:298,tds:580},
+  {name:"Jaunpur",      lat:25.7462,lng:82.6836,risk:"Medium Risk",score:11.62,ec:940, fluoride:0.58,nitrate:42,   hardness:285,tds:560},
+  {name:"Chandauli",    lat:25.2713,lng:83.2694,risk:"Medium Risk",score:11.38,ec:920, fluoride:0.65,nitrate:38,   hardness:274,tds:545},
+  {name:"Azamgarh",     lat:26.0696,lng:83.1838,risk:"Medium Risk",score:11.24,ec:890, fluoride:0.55,nitrate:36,   hardness:265,tds:530},
+  {name:"Sant R. Nagar",lat:25.3917,lng:82.5660,risk:"Medium Risk",score:11.00,ec:870, fluoride:0.61,nitrate:33,   hardness:258,tds:515},
+  {name:"Ballia",       lat:25.7626,lng:84.1474,risk:"Medium Risk",score:10.74,ec:850, fluoride:0.52,nitrate:30,   hardness:248,tds:505},
+  {name:"Sonbhadra",    lat:24.6866,lng:83.0731,risk:"Medium Risk",score:10.52,ec:830, fluoride:0.67,nitrate:28,   hardness:238,tds:495},
+  {name:"Deoria",       lat:26.5020,lng:83.7821,risk:"Low Risk",   score:10.31,ec:810, fluoride:0.48,nitrate:25,   hardness:225,tds:480},
+  {name:"Gorakhpur",    lat:26.7606,lng:83.3732,risk:"Low Risk",   score:10.18,ec:790, fluoride:0.44,nitrate:22,   hardness:215,tds:465},
+  {name:"Prayagraj",    lat:25.4358,lng:81.8463,risk:"Low Risk",   score:10.02,ec:775, fluoride:0.42,nitrate:20,   hardness:208,tds:450},
+  {name:"Mau",          lat:25.9424,lng:83.5612,risk:"Low Risk",   score:9.87, ec:760, fluoride:0.41,nitrate:18,   hardness:198,tds:438},
+  {name:"Varanasi",     lat:25.3176,lng:82.9739,risk:"Low Risk",   score:9.74, ec:745, fluoride:0.39,nitrate:17,   hardness:190,tds:425},
+  {name:"Kushinagar",   lat:26.7399,lng:83.8870,risk:"Low Risk",   score:9.62, ec:728, fluoride:0.37,nitrate:16,   hardness:183,tds:412},
+  {name:"Maharajganj",  lat:27.1306,lng:83.5628,risk:"Low Risk",   score:9.48, ec:712, fluoride:0.35,nitrate:15,   hardness:175,tds:400},
+  {name:"Allahabad",    lat:25.4558,lng:81.9063,risk:"Low Risk",   score:9.32, ec:695, fluoride:0.33,nitrate:14,   hardness:168,tds:388},
+  {name:"Ambedkar Ngr", lat:26.0660,lng:82.6890,risk:"Low Risk",   score:9.18, ec:680, fluoride:0.31,nitrate:13,   hardness:160,tds:375},
+  {name:"Sultanpur",    lat:26.2648,lng:82.0727,risk:"Low Risk",   score:9.04, ec:662, fluoride:0.30,nitrate:12,   hardness:152,tds:362},
+  {name:"Banda",        lat:25.4794,lng:80.3354,risk:"Low Risk",   score:8.92, ec:648, fluoride:0.28,nitrate:11,   hardness:145,tds:350},
+  {name:"Chitrakoot",   lat:25.2032,lng:80.8960,risk:"Low Risk",   score:8.78, ec:632, fluoride:0.27,nitrate:10,   hardness:138,tds:338},
+  {name:"Bhadohi",      lat:25.3982,lng:82.5460,risk:"Low Risk",   score:8.65, ec:618, fluoride:0.25,nitrate:9,    hardness:130,tds:325},
+  {name:"Barabanki",    lat:26.9245,lng:81.1858,risk:"Low Risk",   score:8.52, ec:602, fluoride:0.24,nitrate:8,    hardness:123,tds:312},
+  {name:"Unnao",        lat:26.5497,lng:80.4868,risk:"Low Risk",   score:8.38, ec:588, fluoride:0.22,nitrate:7,    hardness:115,tds:300},
+  {name:"Raebareli",    lat:26.2309,lng:81.2284,risk:"Low Risk",   score:8.24, ec:572, fluoride:0.20,nitrate:6,    hardness:108,tds:288},
+];
+const blocks=[
+  {name:"Muratganj",lat:25.5500,lng:81.4200,district:"Kaushambi", risk:"High Risk",score:27.34,nitrate:"240 mg/L (5.3×)",ec:"1457 µS/cm",hardness:"500 mg/L",note:"Nitrate 5.3× BIS — severe Blue Baby Syndrome risk"},
+  {name:"Mardah",   lat:25.6100,lng:83.6500,district:"Ghazipur",  risk:"High Risk",score:17.49,nitrate:"81.1 mg/L",ec:"1799 µS/cm (2.4×)",hardness:"470 mg/L",note:"Triple contamination: EC + Nitrate + Hardness all exceeding"},
+  {name:"Kunda",    lat:25.7100,lng:81.5100,district:"Pratapgarh",risk:"High Risk",score:13.59,nitrate:"49 mg/L",ec:"1274 µS/cm",hardness:"430 mg/L",note:"Multi-parameter: EC + Nitrate + Hardness exceeding BIS"},
+];
+const villages=[
+  {name:"Balkaranpur",lat:25.5460,lng:81.4150,block:"Muratganj",district:"Kaushambi", score:24.46,site:1,color:"#FF6B6B",
+   frc:"0.05 mg/L (4× risk ratio)",turbidity:"2.63 NTU (2.63×)",hardness:"394 mg/L",tds:"523 mg/L",alkalinity:"424 mg/L",note:"FRC critically low = near-zero disinfection. Acute microbial risk."},
+  {name:"Gain",       lat:25.6060,lng:83.6450,block:"Mardah",   district:"Ghazipur",  score:17.60,site:2,color:"#F4A261",
+   frc:"0.10 mg/L (below 0.2 min)",turbidity:"2.94 NTU (2.94×)",hardness:"162 mg/L",tds:"318 mg/L",alkalinity:"158 mg/L",note:"Physical contamination (turbidity) + disinfection gap."},
+  {name:"Karenti",    lat:25.7060,lng:81.5060,block:"Kunda",    district:"Pratapgarh",score:59.01,site:3,color:"#FFD166",
+   frc:"0.00 mg/L — ZERO!",turbidity:"4.11 NTU (4.11×)",hardness:"316 mg/L",tds:"700.7 mg/L",alkalinity:"382 mg/L",note:"⚠️ MOST SEVERE — FRC=ZERO + 5 parameters exceeding simultaneously!"},
+];
+const blockData={
+  kaushambi:{title:"Kaushambi — 8 Blocks",
+    blocks:["Muratganj","Kara","Chail","Manjhanpur","Sirathu","Bharwari","Sarai Akil","Newtanganj"],
+    scores:[27.34,24.18,14.52,13.87,13.21,12.94,12.46,11.83],
+    risks:["High Risk","High Risk","Medium Risk","Medium Risk","Medium Risk","Low Risk","Low Risk","Low Risk"],
+    worst:{block:"Muratganj",score:27.34,nitrate:"240 mg/L (5.3× BIS!)",ec:"1457 µS/cm (1.9×)",hardness:"500 mg/L (2.5×)",note:"Nitrate 240 mg/L — highest in dataset. Severe Blue Baby Syndrome risk."}},
+  ghazipur:{title:"Ghazipur — 16 Blocks",
+    blocks:["Mardah","Jakhaniya","Birno","Deokali","Saidpur","Kasimabad","Barachawar","Muhammadabad","Jamania","Reotipur","Ghazipur","Karanda","Bhadaura","Bhawarkol","Sadat","Manihari"],
+    scores:[17.49,12.68,11.71,11.42,11.18,10.94,10.72,10.51,10.34,10.18,10.02,9.87,9.74,9.62,9.48,9.35],
+    risks:["High Risk","Medium Risk","Medium Risk","High Risk","High Risk","High Risk","High Risk","Medium Risk","Medium Risk","Medium Risk","Low Risk","Low Risk","Low Risk","Low Risk","Low Risk","Low Risk"],
+    worst:{block:"Mardah",score:17.49,ec:"1799 µS/cm (2.4× BIS)",nitrate:"81.1 mg/L (1.8×)",hardness:"470 mg/L (2.35×)",note:"Triple contamination burden — EC + Nitrate + Hardness exceeding simultaneously."}},
+  pratapgarh:{title:"Pratapgarh — 16 Blocks",
+    blocks:["Kunda","Lalganj","Patti","Raniganj","Shivgarh","Babaganj","Sangipur","Mandhata","Gaura","Pratapgarh","B. Belkernath","Antu","Amethi","Dhamanpur","Dharupur","Sadar"],
+    scores:[13.59,12.84,12.31,11.98,11.72,11.46,11.21,10.98,10.74,10.52,10.31,10.12,9.94,9.78,9.62,9.48],
+    risks:["High Risk","High Risk","Medium Risk","Medium Risk","Medium Risk","Medium Risk","Medium Risk","Low Risk","Low Risk","Low Risk","Low Risk","Low Risk","Low Risk","Low Risk","Low Risk","Low Risk"],
+    worst:{block:"Kunda",score:13.59,ec:"1274 µS/cm (1.7×)",nitrate:"49 mg/L (above BIS)",hardness:"430 mg/L (2.15×)",note:"Multi-parameter contamination. Kunda scores highest overall on composite risk."}},
+};
+const villageData={
+  muratganj:{title:"Muratganj — 61 Villages",labels:["High Risk (14)","Medium Risk (19)","Low Risk (28)"],counts:[14,19,28],
+    worst:{village:"Balkaranpur",score:"24.46",frc:"0.05 mg/L (4× risk ratio — critically low)",hardness:"394 mg/L (1.97×)",turbidity:"2.63 NTU (2.63×)",alkalinity:"424 mg/L (2.12×)",tds:"523 mg/L",note:"FRC near-zero = insufficient disinfection. High turbidity + low FRC = acute microbial risk."}},
+  mardah:{title:"Mardah — 61 Villages",labels:["High Risk (11)","Medium Risk (8)","Low Risk (42)"],counts:[11,8,42],
+    worst:{village:"Gain",score:"17.60",frc:"0.10 mg/L (below minimum 0.2)",turbidity:"2.94 NTU (2.94×)",hardness:"162 mg/L",tds:"318 mg/L",note:"Physical contamination (turbidity) + disinfection gap. Ionic parameters within limits."}},
+  kunda:{title:"Kunda — 24 Villages",labels:["High Risk (4)","Medium Risk (17)","Low Risk (3)"],counts:[4,17,3],
+    worst:{village:"Karenti",score:"59.01",frc:"0.00 mg/L — ZERO (complete absence of disinfection!)",turbidity:"4.11 NTU (4.11×)",hardness:"316 mg/L (1.58×)",tds:"700.7 mg/L (1.4×)",alkalinity:"382.2 mg/L (1.91×)",note:"MOST SEVERE — 5 parameters exceeding simultaneously. FRC=0 = zero microbial protection."}},
+};
+
+const riskColor=r=>r==="High Risk"?"#FF6B6B":r==="Medium Risk"?"#F4A261":"#06D6A0";
+
+// ── LEAFLET MAP ───────────────────────────────────────────────────
+let map=null;
+let districtLayer=null,blockLayer=null,villageLayer=null;
+
+function initMap(){
+  if(map){map.invalidateSize();return;}
+
+  map=L.map('real-map',{center:[25.9,82.5],zoom:7});
+
+  // OSM tiles with dark filter
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright" style="color:#8BAABE">OpenStreetMap</a>',
+    maxZoom:18
+  }).addTo(map);
+
+  // Dark CSS filter on tile pane
+  const mapEl=document.getElementById('real-map');
+  const tilePanes=mapEl.querySelectorAll('.leaflet-tile-pane');
+  tilePanes.forEach(p=>{p.style.filter='brightness(0.35) saturate(0.5)';});
+  // Watch for new tile panes added dynamically
+  const obs=new MutationObserver(()=>{
+    mapEl.querySelectorAll('.leaflet-tile-pane').forEach(p=>{p.style.filter='brightness(0.35) saturate(0.5)';});
+  });
+  obs.observe(mapEl,{childList:true,subtree:true});
+
+  districtLayer=L.layerGroup();
+  blockLayer=L.layerGroup();
+  villageLayer=L.layerGroup();
+
+  // ── District circles ──
+  districts.forEach(d=>{
+    const col=riskColor(d.risk);
+    const radius=9000+(d.score/27)*15000;
+    const circle=L.circle([d.lat,d.lng],{
+      radius,color:col,fillColor:col,fillOpacity:0.22,weight:1.5,opacity:0.9
+    });
+    circle.bindPopup(`
+      <div class="popup-name">${d.name} District</div>
+      <span class="popup-risk" style="background:${col}30;color:${col}">${d.risk} · Score: ${d.score}</span>
+      <div class="popup-row"><span class="popup-key">EC</span><span class="popup-val ${d.ec>750?'bad':'ok'}">${d.ec} µS/cm</span></div>
+      <div class="popup-row"><span class="popup-key">Fluoride</span><span class="popup-val ${d.fluoride>1.0?'bad':'ok'}">${d.fluoride} mg/L</span></div>
+      <div class="popup-row"><span class="popup-key">Nitrate</span><span class="popup-val ${d.nitrate>45?'bad':'ok'}">${d.nitrate} mg/L</span></div>
+      <div class="popup-row"><span class="popup-key">Hardness</span><span class="popup-val ${d.hardness>200?'bad':'ok'}">${d.hardness} mg/L</span></div>
+      <div class="popup-row"><span class="popup-key">TDS</span><span class="popup-val ${d.tds>500?'bad':'ok'}">${d.tds} mg/L</span></div>`,
+      {className:'custom-popup',maxWidth:260});
+    circle.addTo(districtLayer);
+
+    // District label
+    L.marker([d.lat,d.lng],{icon:L.divIcon({
+      html:`<div style="font-size:9px;color:${col};font-weight:700;font-family:Inter,sans-serif;white-space:nowrap;text-shadow:0 0 6px #000,0 0 10px #000,0 0 3px #000;pointer-events:none">${d.name}</div>`,
+      className:'',iconAnchor:[0,-2]
+    }),interactive:false}).addTo(districtLayer);
+  });
+
+  // ── Block diamond markers ──
+  blocks.forEach(b=>{
+    const icon=L.divIcon({
+      html:`<div title="${b.name}" style="width:14px;height:14px;background:#FF6B6B;border:2px solid #fff;transform:rotate(45deg);box-shadow:0 0 10px #FF6B6B,0 0 4px #000;cursor:pointer"></div>`,
+      className:'',iconAnchor:[7,7]
+    });
+    const m=L.marker([b.lat,b.lng],{icon,zIndexOffset:500});
+    m.bindPopup(`
+      <div class="popup-name">🧱 ${b.name} Block</div>
+      <span class="popup-risk" style="background:#FF6B6B30;color:#FF6B6B">Worst Block · ${b.district}</span>
+      <div class="popup-row"><span class="popup-key">Risk Score</span><span class="popup-val bad">${b.score}</span></div>
+      <div class="popup-row"><span class="popup-key">Nitrate</span><span class="popup-val bad">${b.nitrate}</span></div>
+      <div class="popup-row"><span class="popup-key">EC</span><span class="popup-val bad">${b.ec}</span></div>
+      <div class="popup-row"><span class="popup-key">Hardness</span><span class="popup-val bad">${b.hardness}</span></div>
+      <div style="margin-top:8px;font-size:10px;color:#F4A261">${b.note}</div>`,
+      {className:'custom-popup',maxWidth:260});
+    m.addTo(blockLayer);
+  });
+
+  // ── Village star markers ──
+  villages.forEach(v=>{
+    const icon=L.divIcon({
+      html:`<div style="font-size:26px;line-height:1;filter:drop-shadow(0 0 8px ${v.color}) drop-shadow(0 0 3px #000);cursor:pointer">⭐</div>`,
+      className:'',iconAnchor:[13,13]
+    });
+    const m=L.marker([v.lat,v.lng],{icon,zIndexOffset:1000});
+    m.bindPopup(`
+      <div class="popup-name">⭐ ${v.name}</div>
+      <span class="popup-risk" style="background:${v.color}30;color:${v.color}">Field Visit Site #${v.site} · ${v.block}, ${v.district}</span>
+      <div class="popup-row"><span class="popup-key">Risk Score</span><span class="popup-val" style="color:${v.color}">${v.score}</span></div>
+      <div class="popup-row"><span class="popup-key">FRC</span><span class="popup-val bad">${v.frc}</span></div>
+      <div class="popup-row"><span class="popup-key">Turbidity</span><span class="popup-val bad">${v.turbidity}</span></div>
+      <div class="popup-row"><span class="popup-key">Hardness</span><span class="popup-val">${v.hardness}</span></div>
+      <div class="popup-row"><span class="popup-key">TDS</span><span class="popup-val">${v.tds}</span></div>
+      <div class="popup-row"><span class="popup-key">Alkalinity</span><span class="popup-val">${v.alkalinity}</span></div>
+      <div style="margin-top:8px;font-size:10px;color:#FF6B6B">${v.note}</div>`,
+      {className:'custom-popup',maxWidth:270});
+    m.addTo(villageLayer);
+  });
+
+  districtLayer.addTo(map);
+  blockLayer.addTo(map);
+  villageLayer.addTo(map);
+}
+
+function filterMap(type,el){
+  document.querySelectorAll('.map-ctrl-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  if(!map) return;
+  if(districtLayer) districtLayer.remove();
+  if(blockLayer)    blockLayer.remove();
+  if(villageLayer)  villageLayer.remove();
+  if(type==='all'){districtLayer.addTo(map);blockLayer.addTo(map);villageLayer.addTo(map);}
+  else if(type==='district') districtLayer.addTo(map);
+  else if(type==='block'){districtLayer.addTo(map);blockLayer.addTo(map);}
+  else if(type==='village'){districtLayer.addTo(map);villageLayer.addTo(map);}
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────
+let blockChart=null,villageChart=null;
+const titles={overview:'Overview',map:'Risk Map — Eastern UP (OpenStreetMap)',
+  district:'District Level Clustering',block:'Block Level Clustering',
+  village:'Village Level Clustering',sites:'Field Visit Sites',
+  parameters:'Parameter Analysis',diseases:'Health Impact',intel:'AI Intelligence Brief'};
+
+function showPage(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  document.getElementById('page-title').textContent=titles[id]||id;
+  if(id==='map') setTimeout(initMap,80);
+  if(id==='block') initBlockChart('kaushambi');
+  if(id==='village') initVillageChart('muratganj');
+}
+
+// ── DISTRICT LIST ─────────────────────────────────────────────────
+function buildDistrictList(){
+  document.getElementById('districtRankList').innerHTML=districts.map((d,i)=>`
+    <div class="risk-row">
+      <span style="font-size:10px;color:var(--text3);min-width:22px;font-family:var(--mono)">#${i+1}</span>
+      <span class="risk-name">${d.name}</span>
+      <div class="risk-bar-wrap"><div class="risk-bar" style="width:${(d.score/27)*100}%;background:${riskColor(d.risk)}"></div></div>
+      <span class="risk-score">${d.score}</span>
+      <span class="risk-label ${d.risk==='High Risk'?'risk-high':d.risk==='Medium Risk'?'risk-med':'risk-low'}">${d.risk==='High Risk'?'HIGH':d.risk==='Medium Risk'?'MED':'LOW'}</span>
+    </div>`).join('');
+}
+
+function buildBlockDetail(key){
+  const d=blockData[key].worst;
+  document.getElementById('block-detail').innerHTML=`
+    <div style="padding:8px 0">
+      <div style="font-size:20px;font-weight:800;color:var(--red);margin-bottom:4px">${d.block}</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:14px">Worst Block · Score: <strong style="color:var(--cyan);font-family:var(--mono)">${d.score}</strong></div>
+      <div class="intel-box"><div class="intel-label">Why This Block?</div><div class="intel-text">${d.note}</div></div>
+      <table class="bis-table">
+        <tr><th>Parameter</th><th>Value</th><th>Status</th></tr>
+        ${d.nitrate?`<tr><td>Nitrate</td><td class="exceed">${d.nitrate}</td><td class="exceed">❌</td></tr>`:''}
+        ${d.ec?`<tr><td>EC</td><td class="exceed">${d.ec}</td><td class="exceed">❌</td></tr>`:''}
+        ${d.hardness?`<tr><td>Hardness</td><td class="exceed">${d.hardness}</td><td class="exceed">❌</td></tr>`:''}
+      </table>
+    </div>`;
+}
+
+function buildVillageDetail(key){
+  const d=villageData[key].worst;
+  document.getElementById('village-detail').innerHTML=`
+    <div style="padding:8px 0">
+      <div style="font-size:20px;font-weight:800;color:var(--red);margin-bottom:4px">${d.village}</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:14px">Worst Village · Score: <strong style="color:var(--cyan);font-family:var(--mono)">${d.score}</strong></div>
+      <div class="intel-box"><div class="intel-label">Critical Issues</div><div class="intel-text">${d.note}</div></div>
+      <table class="bis-table">
+        <tr><th>Parameter</th><th>Value</th><th>Status</th></tr>
+        <tr><td>FRC</td><td class="exceed">${d.frc}</td><td class="exceed">❌</td></tr>
+        <tr><td>Turbidity</td><td class="exceed">${d.turbidity}</td><td class="exceed">❌</td></tr>
+        ${d.hardness?`<tr><td>Hardness</td><td>${d.hardness}</td><td></td></tr>`:''}
+        ${d.tds?`<tr><td>TDS</td><td>${d.tds}</td><td></td></tr>`:''}
+        ${d.alkalinity?`<tr><td>Alkalinity</td><td class="exceed">${d.alkalinity}</td><td class="exceed">❌</td></tr>`:''}
+      </table>
+    </div>`;
+}
+
+// ── CHARTS ────────────────────────────────────────────────────────
+const CD={plugins:{legend:{labels:{color:'#8BAABE',font:{size:10}}}},
+  scales:{x:{ticks:{color:'#8BAABE',font:{size:9}},grid:{color:'#1E3A52'}},
+          y:{ticks:{color:'#8BAABE',font:{size:9}},grid:{color:'#1E3A52'}}}};
+
+new Chart(document.getElementById('donutChart'),{type:'doughnut',
+  data:{labels:['High Risk (1)','Medium Risk (10)','Low Risk (16)'],
+    datasets:[{data:[1,10,16],backgroundColor:['#FF6B6B','#F4A261','#06D6A0'],borderWidth:0}]},
+  options:{plugins:{legend:{labels:{color:'#8BAABE',font:{size:11}},position:'bottom'}},cutout:'65%'}});
+
+new Chart(document.getElementById('districtBar'),{type:'bar',
+  data:{labels:districts.slice(0,10).map(d=>d.name),
+    datasets:[{data:districts.slice(0,10).map(d=>d.score),
+      backgroundColor:districts.slice(0,10).map(d=>riskColor(d.risk)),borderRadius:4,borderSkipped:false}]},
+  options:{...CD,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{...CD.scales.x,max:30},y:CD.scales.y}}});
+
+new Chart(document.getElementById('districtFull'),{type:'bar',
+  data:{labels:districts.map(d=>d.name),
+    datasets:[{data:districts.map(d=>d.score),
+      backgroundColor:districts.map(d=>riskColor(d.risk)),borderRadius:3,borderSkipped:false}]},
+  options:{...CD,indexAxis:'y',plugins:{legend:{display:false}},
+    scales:{x:CD.scales.x,y:{...CD.scales.y,ticks:{font:{size:8},color:'#8BAABE'}}}}});
+
+new Chart(document.getElementById('siteCompare'),{type:'bar',
+  data:{labels:['TDS','Hardness','Turbidity','Alkalinity','FRC*'],
+    datasets:[
+      {label:'Balkaranpur #1',data:[1.05,1.97,2.63,2.12,4.0], backgroundColor:'#FF6B6B',borderRadius:3},
+      {label:'Gain #2',       data:[0.64,0.81,2.94,null,2.0], backgroundColor:'#F4A261',borderRadius:3},
+      {label:'Karenti #3',    data:[1.40,1.58,4.11,1.91,20.0],backgroundColor:'#FFD166',borderRadius:3},
+    ]},
+  options:{...CD,plugins:{legend:{labels:{color:'#8BAABE',font:{size:10}}}},
+    scales:{x:CD.scales.x,y:{...CD.scales.y,title:{display:true,text:'Value / BIS Limit (>1.0 = exceeding)',color:'#8BAABE',font:{size:9}}}}}});
+
+new Chart(document.getElementById('paramRadar'),{type:'radar',
+  data:{labels:['pH','EC','Fluoride','Nitrate','Hardness','TDS'],
+    datasets:[
+      {label:'Kaushambi', data:[0.92,1.69,1.27,3.24,2.50,1.62],borderColor:'#FF6B6B',backgroundColor:'#FF6B6B18',pointBackgroundColor:'#FF6B6B'},
+      {label:'Ghazipur',  data:[0.90,1.87,0.56,1.80,2.20,1.80],borderColor:'#F4A261',backgroundColor:'#F4A26118',pointBackgroundColor:'#F4A261'},
+      {label:'Pratapgarh',data:[0.92,1.70,0.57,1.09,2.15,1.45],borderColor:'#FFD166',backgroundColor:'#FFD16618',pointBackgroundColor:'#FFD166'},
+    ]},
+  options:{plugins:{legend:{labels:{color:'#8BAABE',font:{size:10}}}},
+    scales:{r:{ticks:{color:'#8BAABE',backdropColor:'transparent',font:{size:9}},
+      grid:{color:'#1E3A52'},pointLabels:{color:'#8BAABE',font:{size:10}},suggestedMin:0,suggestedMax:3.5}}}});
+
+new Chart(document.getElementById('paramGrouped'),{type:'bar',
+  data:{labels:['EC','Fluoride','Nitrate','Hardness','TDS'],
+    datasets:[
+      {label:'Kaushambi', data:[1.69,1.27,3.24,2.50,1.62],backgroundColor:'#FF6B6B',borderRadius:3},
+      {label:'Ghazipur',  data:[1.87,0.56,1.80,2.20,1.80],backgroundColor:'#F4A261',borderRadius:3},
+      {label:'Pratapgarh',data:[1.70,0.57,1.09,2.15,1.45],backgroundColor:'#FFD166',borderRadius:3},
+    ]},
+  options:{...CD,plugins:{legend:{labels:{color:'#8BAABE',font:{size:10}}}},
+    scales:{x:CD.scales.x,y:{...CD.scales.y,title:{display:true,text:'Value / BIS Limit',color:'#8BAABE',font:{size:9}}}}}});
+
+new Chart(document.getElementById('diseaseChart'),{type:'bar',
+  data:{labels:['Nitrate→\nBlue Baby','Fluoride→\nFluorosis','Arsenic→\nArsenicosis','Hardness→\nKidney Stones','Low FRC→\nDiarrhoea','Turbidity→\nTyphoid','Hepatitis E'],
+    datasets:[
+      {label:'Children Vulnerability',data:[95,80,70,55,90,75,85],backgroundColor:'#FF6B6B80',borderRadius:3},
+      {label:'Women Vulnerability',   data:[60,85,70,60,80,80,95],backgroundColor:'#00B4D880',borderRadius:3},
+    ]},
+  options:{...CD,scales:{x:{...CD.scales.x,ticks:{font:{size:8}}},
+    y:{...CD.scales.y,max:100,title:{display:true,text:'Relative Vulnerability Index',color:'#8BAABE',font:{size:9}}}}}});
+
+function initBlockChart(key){
+  const d=blockData[key];
+  document.getElementById('block-chart-title').textContent=d.title;
+  if(blockChart) blockChart.destroy();
+  blockChart=new Chart(document.getElementById('blockBar'),{type:'bar',
+    data:{labels:d.blocks,datasets:[{data:d.scores,
+      backgroundColor:d.risks.map(r=>riskColor(r)),borderRadius:4,borderSkipped:false}]},
+    options:{...CD,indexAxis:'y',plugins:{legend:{display:false}},
+      scales:{x:CD.scales.x,y:{...CD.scales.y,ticks:{font:{size:9}}}}}});
+  buildBlockDetail(key);
+}
+
+function showBlockTab(key,el){
+  document.querySelectorAll('#page-block .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');initBlockChart(key);
+}
+
+function initVillageChart(key){
+  const d=villageData[key];
+  document.getElementById('village-chart-title').textContent=d.title;
+  if(villageChart){try{villageChart.destroy()}catch(e){}}
+  villageChart=new Chart(document.getElementById('villageChart'),{type:'doughnut',
+    data:{labels:d.labels,datasets:[{data:d.counts,
+      backgroundColor:['#FF6B6B','#F4A261','#06D6A0'],borderWidth:0,hoverOffset:6}]},
+    options:{plugins:{legend:{labels:{color:'#8BAABE',font:{size:11}},position:'bottom'}},cutout:'60%'}});
+  buildVillageDetail(key);
+}
+
+function showVillageTab(key,el){
+  document.querySelectorAll('#page-village .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');initVillageChart(key);
+}
+
+// Init
+buildDistrictList();
+</script>
+</body>
+</html>
